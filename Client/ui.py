@@ -71,46 +71,36 @@ def read_move_safe(board_size):
     Read a move from the user with validation
     Returns: (row_str, col_str) - both as strings for compatibility
     """
-    max_retries = 3
-    retry_count = 0
-    
-    while retry_count < max_retries:
+    while True:
         try:
             print("\nEnter your move:")
             row_input = input("  Row: ").strip()
             col_input = input("  Col: ").strip()
-            
+
             # Try to parse as integers
             try:
                 row = int(row_input)
                 col = int(col_input)
             except ValueError:
                 print("Please enter valid numbers")
-                retry_count += 1
                 continue
-            
+
             # Validate range if we know the board size
             if board_size is not None:
                 if row < 0 or row >= board_size:
                     print(f"Row must be between 0 and {board_size - 1}")
-                    retry_count += 1
                     continue
-                
+
                 if col < 0 or col >= board_size:
                     print(f"Column must be between 0 and {board_size - 1}")
-                    retry_count += 1
                     continue
-            
+
             # Valid input - return as strings (for compatibility with existing code)
             return str(row), str(col)
-        
+    
         except Exception as e:
             print(f"Error reading input: {e}")
-            retry_count += 1
-    
-    # If we exhausted retries, return default
-    print("Too many invalid attempts, using default move (0, 0)")
-    return "0", "0"
+            continue
 
 
 def print_welcome():

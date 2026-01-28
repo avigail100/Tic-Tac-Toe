@@ -286,7 +286,6 @@ class TicTacToeServer:
         Send board and tell first player it's their turn
         """
         print(f"[GAME STARTED] Game {game.game_id}")
-        print(game.get_board_string())
 
         # Send board to all players
         board_str = game.get_board_string()
@@ -364,24 +363,55 @@ class TicTacToeServer:
         except Exception as e:
             print(f"[ERROR] Failed to send message: {e}")
     
-    def disconnect_client(self, conn, addr):
-        """Clean up when client disconnects"""
-        print(f"[DISCONNECTED] {addr}")
+    # def disconnect_client(self, conn, addr):
+    #     """Clean up when client disconnects"""
+    #     print(f"[DISCONNECTED] {addr}")
         
-        # Remove from connection tracking
-        with self.conn_lock:
-            if conn in self.conn_to_game:
-                game_id = self.conn_to_game[conn]
-                del self.conn_to_game[conn]
+    #     # Remove from connection tracking
+    #     with self.conn_lock:
+    #         if conn in self.conn_to_game:
+    #             game_id = self.conn_to_game[conn]
+    #             del self.conn_to_game[conn]
                 
-                # TODO: Handle player leaving active game
-                # For now, we just note it
-                print(f"[PLAYER LEFT] {addr} left game {game_id}")
+    #             # TODO: Handle player leaving active game
+    #             # For now, we just note it
+    #             print(f"[PLAYER LEFT] {addr} left game {game_id}")
         
+    #     try:
+    #         conn.close()
+    #     except:
+    #         pass
+
+    def disconnect_client(self, conn, addr):
+        print(f"[DISCONNECTED] {addr}")
+    
+        with self.conn_lock:
+            game_id = self.conn_to_game.pop(conn, None)
+    
+        if game_id:
+            with self.games_lock:
+                game = self.games.get(game_id)
+    
+                if game:
+                    result = game.remove_player(conn)
+    
+                    # הודעה לשחקנים שנשארו
+                    for p in game.players:
+                        self.send(p.conn, f"PLAYER_LEFT")
+    
+                    # אם המשחק נגמר/בוטל
+                    if result == "abort":
+                        for p in game.players:
+                            self.send(p.conn, "GAME_ABORTED")
+    
+                        del self.games[game_id]
+                        print(f"[GAME REMOVED] Game {game_id} deleted")
+    
         try:
             conn.close()
         except:
             pass
+
     
     def shutdown(self):
         """Shutdown the server"""

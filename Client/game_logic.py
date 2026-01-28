@@ -169,7 +169,7 @@ class Game:
         """
         lines = ["BOARD"]
         for row in self.board:
-            lines.append("*".join(row))
+            lines.append(" ".join(row))
         return "\n".join(lines)
     
     def get_player_by_conn(self, conn):
@@ -178,3 +178,25 @@ class Game:
             if player.conn == conn:
                 return player
         return None
+
+    def remove_player(self, conn):
+        player = self.get_player_by_conn(conn)
+        if not player:
+            return None
+
+        self.players.remove(player)
+        if len(self.players) == 0:
+            self.ended = True
+            return "abort"
+        # אם המשחק התחיל ועדיין לא נגמר
+        if self.started and not self.ended:
+            if len(self.players) <= 1:
+                self.ended = True
+                return "abort"
+
+            # תקן תור אם צריך
+            if self.current_turn >= len(self.players):
+                self.current_turn = 0
+
+        return player.symbol
+

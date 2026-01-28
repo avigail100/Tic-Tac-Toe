@@ -129,7 +129,7 @@ def ask_for_move():
     
     # Get move from player
     row, col = read_move_safe(board_size)
-    
+
     # Validate that we got valid integers
     try:
         r = int(row)
@@ -153,6 +153,10 @@ def ask_for_move():
 def handle_server_message(data):
     """Handle incoming messages from server"""
     global in_game, board_size
+    
+    if data.startswith("BOARD"):
+        handle_single_message(data.strip())
+        return
     
     # Handle multiple messages in one packet
     messages = data.strip().split('\n')
@@ -232,7 +236,6 @@ def handle_single_message(message):
     #     print("=" * 40)
     #     return
     if message.startswith("BOARD"):
-        print(message)
         # split board block from the rest
         parts = message.split("\n")
 
@@ -293,6 +296,18 @@ def handle_single_message(message):
         print("\nDisconnected from server.")
         print("Returning to main menu...")
         return
+
+        # PLAYER_LEFT - someone left the game
+    if message.startswith("PLAYER_LEFT"):
+        print("\n A player has left the game.")
+        return
+
+    # GAME_ABORTED - game cancelled
+    if message == "GAME_ABORTED":
+        print("\n Game aborted (not enough players).")
+        in_game = False
+        return
+
 
     # Unknown message - just print it
     if message:
