@@ -11,7 +11,8 @@ ADDR = (HOST, PORT)
 
 board_size = None
 in_game = False
-waiting_for_move = False  # NEW: Track if we're waiting for player input
+waiting_for_move = False 
+game_active = False
 
 
 def listen_to_server():
@@ -32,7 +33,6 @@ def listen_to_server():
             if client_socket.fileno() != -1:
                 print(f"\n[ERROR] Connection error: {e}")
             break
-
 
 def start_client():
     """Main client function"""
@@ -119,16 +119,23 @@ def start_client():
         pass
     print("\n[CLOSING CONNECTION] client closed socket!")
 
-
 def ask_for_move():
     """Ask player for a move and send it to server"""
-    global waiting_for_move
+    global waiting_for_move, game_active
+    print(game_active)
+    if not game_active:
+        return
     
     waiting_for_move = True
     print("\nIt is your turn!")
     
     # Get move from player
     row, col = read_move_safe(board_size)
+
+     #  המשחק נגמר בזמן הקלט
+    if not game_active:
+        waiting_for_move = False
+        return
 
     # Validate that we got valid integers
     try:
@@ -140,6 +147,10 @@ def ask_for_move():
         ask_for_move()  # Try again
         return
     
+    if not game_active:
+        waiting_for_move = False
+        return
+    
     # Send to server
     try:
         client_socket.send(msg.encode(FORMAT))
@@ -148,7 +159,6 @@ def ask_for_move():
         print(f"\n[ERROR] Failed to send move: {e}")
     
     waiting_for_move = False
-
 
 def handle_server_message(data):
     """Handle incoming messages from server"""
@@ -167,7 +177,6 @@ def handle_server_message(data):
             continue
         
         handle_single_message(message)
-
 
 def handle_single_message(message):
     """Handle a single message from server"""
@@ -207,7 +216,9 @@ def handle_single_message(message):
 
     # JOINED - Joined game successfully
     if message.startswith("JOINED"):
+        global game_active
         in_game = True
+        game_active = True
         parts = message.split()
         if len(parts) >= 2:
             symbol = parts[1]
@@ -270,6 +281,7 @@ def handle_single_message(message):
     # WIN - You won!
     if message == "WIN":
         in_game = False
+        game_active = False
         print("\n" + "=" * 40)
         print("CONGRATULATIONS! YOU WON! :)")
         print("=" * 40)
@@ -278,6 +290,7 @@ def handle_single_message(message):
     # LOSE - You lost
     if message == "LOSE":
         in_game = False
+        game_active = False
         print("\n" + "=" * 40)
         print("You lost the game :( Better luck next time!")
         print("=" * 40)
@@ -286,6 +299,7 @@ def handle_single_message(message):
     # DRAW - Game ended in draw
     if message == "DRAW":
         in_game = False
+        game_active = False
         print("\n" + "=" * 40)
         print("Game ended in a draw.")
         print("=" * 40)
@@ -306,8 +320,8 @@ def handle_single_message(message):
     if message == "GAME_ABORTED":
         print("\n Game aborted (not enough players).")
         in_game = False
+        game_active = False
         return
-
 
     # Unknown message - just print it
     if message:

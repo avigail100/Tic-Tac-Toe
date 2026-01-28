@@ -3,8 +3,7 @@ Tic-Tac-Toe Game Logic
 Simple, flat implementation for multi-player game
 """
 
-SYMBOLS = ['X', 'O', 'A', 'B']
-
+SYMBOLS = ['X', 'O', '△', '𝄞', '✿', '♕', '♖', '☀︎', '♥', '♣', '♦', '♠', '♫']
 
 class Player:
     """Represents a player in the game"""
@@ -26,8 +25,8 @@ class Game:
     
     def __init__(self, game_id, num_players):
         """Initialize a new game"""
-        if num_players < 2 or num_players > 4:
-            raise ValueError("Number of players must be between 2 and 4")
+        if num_players < 2 or num_players > 13:
+            raise ValueError("Number of players must be between 2 and 13")
         
         self.game_id = game_id
         self.num_players = num_players
@@ -173,10 +172,31 @@ class Game:
             lines.append(" ".join(row))
         return "\n".join(lines)
     
-    
     def get_player_by_conn(self, conn):
         """Get player by connection"""
         for player in self.players:
             if player.conn == conn:
                 return player
         return None
+
+    def remove_player(self, conn):
+        player = self.get_player_by_conn(conn)
+        if not player:
+            return None
+
+        self.players.remove(player)
+        if len(self.players) == 0:
+            self.ended = True
+            return "abort"
+        # אם המשחק התחיל ועדיין לא נגמר
+        if self.started and not self.ended:
+            if len(self.players) <= 1:
+                self.ended = True
+                return "abort"
+
+            # תקן תור אם צריך
+            if self.current_turn >= len(self.players):
+                self.current_turn = 0
+
+        return player.symbol
+

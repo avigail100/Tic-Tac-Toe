@@ -11,24 +11,31 @@ ADDR = (HOST, PORT)
 
 board_size = None
 in_game = False
+waiting_for_move = False 
+game_active = False
 
 
 def listen_to_server():
+    """Background thread that listens for server messages"""
     while True:
         try:
             data = client_socket.recv(1024).decode(FORMAT)
 
             # connection closed
             if not data:
+                print("\n[CONNECTION LOST] Server disconnected")
                 break
 
             handle_server_message(data)
 
-        except:
+        except Exception as e:
+            # Only print error if it's not just a closed socket
+            if client_socket.fileno() != -1:
+                print(f"\n[ERROR] Connection error: {e}")
             break
 
-
 def start_client():
+    """Main client function"""
     try:
         client_socket.connect((HOST, PORT))
         print("Connected to server.\n")
@@ -38,8 +45,8 @@ def start_client():
         print("Please make sure the server is running and try again.\n")
         return
 
-    except Exception:
-        print("\nError: Connection failed.\n")
+    except Exception as e:
+        print(f"\nError: Connection failed - {e}\n")
         return
 
 
@@ -64,10 +71,25 @@ def start_client():
 
         elif choice == "2":
             players = input("How many players (2-13)? ")
+            # Validate input
+            try:
+                num = int(players)
+                if num < 2 or num > 13:
+                    print("Number of players must be between 2 and 13")
+                    continue
+            except ValueError:
+                print("Invalid number")
+                continue
             message = f"CREATE {players}"
 
         elif choice == "3":
             game_id = input("Enter game id: ")
+            # Validate input
+            try:
+                int(game_id)
+            except ValueError:
+                print("Invalid game ID")
+                continue
             message = f"JOIN {game_id}"
 
         elif choice == "4":
@@ -81,52 +103,149 @@ def start_client():
 
 
         # send to server
-        client_socket.send(message.encode(FORMAT))
-        print(f"[SENT] {message}")
+        try:
+            client_socket.send(message.encode(FORMAT))
+            print(f"[SENT] {message}")
+        except Exception as e:
+            print(f"\n[ERROR] Failed to send message: {e}")
+            break
 
         time.sleep(0.3)
 
 
-    client_socket.close()
+    try:
+        client_socket.close()
+    except:
+        pass
     print("\n[CLOSING CONNECTION] client closed socket!")
 
+def ask_for_move():
+    """Ask player for a move and send it to server"""
+    global waiting_for_move, game_active
+    
+    if not game_active:
+        return
+    
+    waiting_for_move = True
+    print("\nIt is your turn!")
+    
+    # Get move from player - pass a lambda that checks game_active
+    row, col = read_move_safe(board_size, lambda: game_active)
+
+    # Check if game was aborted during input (None returned)
+    if row is None or col is None:
+        waiting_for_move = False
+        return
+
+    # Game ended during input
+    if not game_active:
+        waiting_for_move = False
+        return
+
+    # Validate that we got valid integers
+    try:
+        r = int(row)
+        c = int(col)
+        msg = f"MOVE {r} {c}"
+    except (ValueError, TypeError):
+        if not game_active:
+            waiting_for_move = False
+            return
+        print("Invalid input, please try again")
+        waiting_for_move = False
+        ask_for_move()  # Try again
+        return
+    
+    if not game_active:
+        waiting_for_move = False
+        return
+    
+    # Send to server
+    try:
+        client_socket.send(msg.encode(FORMAT))
+        print(f"[SENT] {msg}")
+    except Exception as e:
+        print(f"\n[ERROR] Failed to send move: {e}")
+    
+    waiting_for_move = False
+
 def handle_server_message(data):
+    """Handle incoming messages from server"""
     global in_game, board_size
-    message = data.strip()
+    
+    if data.startswith("BOARD"):
+        handle_single_message(data.strip())
+        return
+    
+    # Handle multiple messages in one packet
+    messages = data.strip().split('\n')
+    
+    for message in messages:
+        message = message.strip()
+        if not message:
+            continue
+        
+        handle_single_message(message)
 
+def handle_single_message(message):
+    """Handle a single message from server"""
+    global in_game, board_size, game_active
+    
+    # GAMES - List of available games
     if message.startswith("GAMES"):
-        games = message[6:]
+        games = message[6:].strip()
         print("\nAvailable games:")
-        print(games if games else "No available games")
+        if games:
+            # Parse: "waiting 1:2:1 2:3:2"
+            if games.startswith("waiting"):
+                game_list = games[8:].strip().split()
+                if game_list:
+                    print("  ID | Players | Joined")
+                    print("  " + "-" * 25)
+                    for game in game_list:
+                        parts = game.split(':')
+                        if len(parts) == 3:
+                            gid, total, joined = parts
+                            print(f"  {gid:2} | {total:7} | {joined:6}")
+                else:
+                    print("  No available games")
+            else:
+                print(f"  {games}")
+        else:
+            print("  No available games")
         return
 
+    # CREATED - Game created successfully
     if message.startswith("CREATED"):
-        game_id = message.split()[1]
-        print(f"\nGame created successfully. Game id: {game_id}")
+        parts = message.split()
+        if len(parts) >= 2:
+            game_id = parts[1]
+            print(f"\nGame created successfully. Game ID: {game_id}")
         return
 
+    # JOINED - Joined game successfully
     if message.startswith("JOINED"):
         in_game = True
-        symbol = message.split()[1]
-        print(f"\nYou joined the game as: {symbol}")
+        game_active = True
+        parts = message.split()
+        if len(parts) >= 2:
+            symbol = parts[1]
+            print(f"\nYou joined the game as: {symbol}")
         return
 
+    # WAIT - Waiting for other players
     if message.startswith("WAIT"):
         print("\nWaiting for other players to join...")
         return
 
+    # YOURTURN - It's your turn
     if message.startswith("YOURTURN"):
-        print("\nIt is your turn!")
-
-        # ask for move directly
-        row, col = read_move_safe(board_size)
-        msg = f"MOVE {row} {col}"
-
-        client_socket.send(msg.encode(FORMAT))
-        print(f"[SENT] {msg}")
+        # Only start asking for move if game is still active
+        if game_active:
+            threading.Thread(target=ask_for_move, daemon=True).start()
         return
 
-
+    # BOARD - Board state
     if message.startswith("BOARD"):
         # split board block from the rest
         parts = message.split("\n")
@@ -151,38 +270,70 @@ def handle_server_message(data):
 
         return
 
+    # INVALID - Invalid move
     if message.startswith("INVALID"):
-        reason = message[8:]
+        reason = message[8:].strip() if len(message) > 8 else "Unknown reason"
         print(f"\nInvalid move: {reason}")
+        print("Please try again.")
+        # The server should send YOURTURN again, so we wait for that
         return
 
-    if message in ["WIN", "LOSE", "DRAW"]:
+    # WIN - You won!
+    if message == "WIN":
         in_game = False
-
-        if message == "WIN":
-            print("\nYou won the game!")
-
-        elif message == "LOSE":
-            print("\nYou lost the game.")
-
-        else:
-            print("\nGame ended in a draw.")
-
+        game_active = False
+        print("\n" + "=" * 40)
+        print("CONGRATULATIONS! YOU WON! :)")
+        print("=" * 40)
         return
 
+    # LOSE - You lost
+    if message == "LOSE":
+        in_game = False
+        game_active = False
+        print("\n" + "=" * 40)
+        print("You lost the game :( Better luck next time!")
+        print("=" * 40)
+        return
+
+    # DRAW - Game ended in draw
+    if message == "DRAW":
+        in_game = False
+        game_active = False
+        print("\n" + "=" * 40)
+        print("Game ended in a draw.")
+        print("=" * 40)
+        return
+
+    # BYE - Disconnected
     if message == "BYE":
         print("\nDisconnected from server.")
         print("Returning to main menu...")
         return
 
+    # PLAYER_LEFT - someone left the game
+    if message.startswith("PLAYER_LEFT"):
+        print("\nA player has left the game.")
+        return
 
-    print("\n[SERVER]:")
-    print(message)
+    # GAME_ABORTED - game cancelled
+    if message == "GAME_ABORTED":
+        print("\nGame aborted (not enough players).")
+        in_game = False
+        game_active = False
+        return
+
+    # Unknown message - just print it
+    if message:
+        print(f"\n[SERVER]: {message}")
 
 
 if __name__ == "__main__":
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    print("[CLIENT] Started running")
+    print("=" * 50)
+    print("TIC-TAC-TOE CLIENT")
+    print("=" * 50)
+    print("[CLIENT] Starting...")
     start_client()
-    print("\nGoodbye client:)")
+    print("\nGoodbye!")

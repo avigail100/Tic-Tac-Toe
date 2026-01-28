@@ -65,7 +65,6 @@ def print_board_text(board_text):
     print()
     return size
 
-
 def read_move_safe(board_size):
     """
     Read a move from the user with validation
