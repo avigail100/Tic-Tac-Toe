@@ -62,7 +62,6 @@ class Game:
         
         # Assign symbol
         if not self.available_symbols:
-            print(f"available symbols: {self.available_symbols}")
             return False, "No symbols available"
 
         symbol = self.available_symbols.pop(0)

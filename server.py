@@ -1,6 +1,5 @@
 """
 Tic-Tac-Toe Game Server
-Matches the exact protocol from the client
 """
 
 import socket
@@ -184,7 +183,7 @@ class TicTacToeServer:
             for game_id, game in self.games.items():
                 if game.is_waiting():
                     # Format: <game_id>:<num_players>:<joined>
-                    waiting_games.append(f"game id: {game_id},total players: {game.num_players},waiting players: {len(game.players)}")
+                    waiting_games.append(f"{game_id}:{game.num_players}:{len(game.players)}")
             
             if waiting_games:
                 games_str = " ".join(waiting_games)
@@ -231,12 +230,6 @@ class TicTacToeServer:
         
         print(f"[GAME CREATED] Game {game_id} by {addr} ({num_players} players)")
         
-        # # If game started immediately (shouldn't happen with 2+ players)
-        # if game.started:
-        #     self.start_game(game)
-        # else:
-        #     self.send(conn, "WAIT")
-    
     def handle_join(self, conn, addr, game_id):
         """
         Handle JOIN command
@@ -363,24 +356,6 @@ class TicTacToeServer:
         except Exception as e:
             print(f"[ERROR] Failed to send message: {e}")
     
-    # def disconnect_client(self, conn, addr):
-    #     """Clean up when client disconnects"""
-    #     print(f"[DISCONNECTED] {addr}")
-        
-    #     # Remove from connection tracking
-    #     with self.conn_lock:
-    #         if conn in self.conn_to_game:
-    #             game_id = self.conn_to_game[conn]
-    #             del self.conn_to_game[conn]
-                
-    #             # TODO: Handle player leaving active game
-    #             # For now, we just note it
-    #             print(f"[PLAYER LEFT] {addr} left game {game_id}")
-        
-    #     try:
-    #         conn.close()
-    #     except:
-    #         pass
 
     def disconnect_client(self, conn, addr):
         print(f"[DISCONNECTED] {addr}")

@@ -3,7 +3,7 @@
 def print_menu():
     """Display main menu"""
     print("\n" + "=" * 35)
-    print("    TIC TAC TOE CLIENT")
+    print(" MENU ")
     print("=" * 35)
     print("1. List available games")
     print("2. Create new game")
@@ -120,23 +120,3 @@ def read_move_safe(board_size, game_active_check=None):
         except Exception as e:
             print(f"Error reading input: {e}")
             continue
-
-
-def print_welcome():
-    """Print welcome banner"""
-    print()
-    print("=" * 50)
-    print("     WELCOME TO TIC-TAC-TOE MULTIPLAYER")
-    print("=" * 50)
-    print()
-
-
-def print_game_rules():
-    """Print game rules"""
-    print("\nGame Rules:")
-    print("  • Get 3 symbols in a row to win (horizontal, vertical, or diagonal)")
-    print("  • Board size = number of players + 1")
-    print("  • 2 players → 3×3 board")
-    print("  • 3 players → 4×4 board")
-    print("  • 4 players → 5×5 board")
-    print()

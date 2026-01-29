@@ -57,12 +57,12 @@ def start_client():
 
     while True:
 
-        # בזמן משחק – הלולאה הראשית לא עושה כלום
+        # If in game, skip menu
         if in_game:
             time.sleep(0.2)
             continue
 
-        # רק כשלא במשחק מציגים תפריט
+        # Only show menu when not in game
         print_menu()
         choice = input("Choose option: ")
 
@@ -105,7 +105,6 @@ def start_client():
         # send to server
         try:
             client_socket.send(message.encode(FORMAT))
-            print(f"[SENT] {message}")
         except Exception as e:
             print(f"\n[ERROR] Failed to send message: {e}")
             break
@@ -117,7 +116,7 @@ def start_client():
         client_socket.close()
     except:
         pass
-    print("\n[CLOSING CONNECTION] client closed socket!")
+    print("\nCLOSING CONNECTION...")
 
 def ask_for_move():
     """Ask player for a move and send it to server"""
@@ -163,7 +162,6 @@ def ask_for_move():
     # Send to server
     try:
         client_socket.send(msg.encode(FORMAT))
-        print(f"[SENT] {msg}")
     except Exception as e:
         print(f"\n[ERROR] Failed to send move: {e}")
     
@@ -197,20 +195,18 @@ def handle_single_message(message):
         print("\nAvailable games:")
         if games:
             # Parse: "waiting 1:2:1 2:3:2"
-            if games.startswith("waiting"):
-                game_list = games[8:].strip().split()
-                if game_list:
-                    print("  ID | Players | Joined")
-                    print("  " + "-" * 25)
-                    for game in game_list:
-                        parts = game.split(':')
-                        if len(parts) == 3:
-                            gid, total, joined = parts
-                            print(f"  {gid:2} | {total:7} | {joined:6}")
-                else:
-                    print("  No available games")
+            game_list = games[0:].strip().split()
+            if game_list:
+                print("  ID | Players | Joined")
+                print("  " + "-" * 25)
+                for game in game_list:
+                    parts = game.split(':')
+                    if len(parts) == 3:
+                        gid, total, joined = parts
+                        print(f"  {gid:2} | {total:7} | {joined:6}")
             else:
-                print(f"  {games}")
+                print("  No available games")
+
         else:
             print("  No available games")
         return
@@ -325,15 +321,14 @@ def handle_single_message(message):
 
     # Unknown message - just print it
     if message:
-        print(f"\n[SERVER]: {message}")
+        print(f"\n{message}")
 
 
 if __name__ == "__main__":
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     print("=" * 50)
-    print("TIC-TAC-TOE CLIENT")
+    print("WELCOME TO TIC-TAC-TOE")
     print("=" * 50)
-    print("[CLIENT] Starting...")
     start_client()
     print("\nGoodbye!")
