@@ -38,6 +38,8 @@ class Game:
         self.ended = False
         self.winner = None
         self.move_count = 0
+        self.available_symbols = SYMBOLS[:]
+
     
     def is_full(self):
         """Check if game is full"""
@@ -59,7 +61,11 @@ class Game:
             return False, "Game is full"
         
         # Assign symbol
-        symbol = SYMBOLS[len(self.players)]
+        if not self.available_symbols:
+            print(f"available symbols: {self.available_symbols}")
+            return False, "No symbols available"
+
+        symbol = self.available_symbols.pop(0)
         player = Player(conn, addr, symbol)
         self.players.append(player)
         
@@ -185,16 +191,18 @@ class Game:
             return None
 
         self.players.remove(player)
+        self.available_symbols.append(player.symbol)
+
         if len(self.players) == 0:
             self.ended = True
             return "abort"
-        # אם המשחק התחיל ועדיין לא נגמר
+        # Adjust current turn index
         if self.started and not self.ended:
             if len(self.players) <= 1:
                 self.ended = True
                 return "abort"
 
-            # תקן תור אם צריך
+            # update current turn index if necessary
             if self.current_turn >= len(self.players):
                 self.current_turn = 0
 

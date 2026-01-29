@@ -184,10 +184,10 @@ class TicTacToeServer:
             for game_id, game in self.games.items():
                 if game.is_waiting():
                     # Format: <game_id>:<num_players>:<joined>
-                    waiting_games.append(f"game id: {game_id},total players:{game.num_players},waiting players:{len(game.players)}")
+                    waiting_games.append(f"game id: {game_id},total players: {game.num_players},waiting players: {len(game.players)}")
             
             if waiting_games:
-                games_str = "available " + " ".join(waiting_games)
+                games_str = " ".join(waiting_games)
             else:
                 games_str = ""
             
