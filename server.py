@@ -73,7 +73,7 @@ class TicTacToeServer:
                 
                 except Exception as e:
                     if self.running:
-                        print(f"[ERROR] Accept error: {e}")
+                        pass
         
         except Exception as e:
             print(f"[ERROR] Server start failed: {e}")
@@ -108,7 +108,6 @@ class TicTacToeServer:
                     print(f"[CONNECTION RESET] {addr}")
                     break
                 except Exception as e:
-                    print(f"[ERROR handling {addr}] {e}")
                     break
         
         finally:
@@ -350,7 +349,7 @@ class TicTacToeServer:
         try:
             conn.send((message + "\n").encode(FORMAT))
         except Exception as e:
-            print(f"[ERROR] Failed to send message: {e}")
+            pass
     
     def disconnect_client(self, conn, addr):
         """
