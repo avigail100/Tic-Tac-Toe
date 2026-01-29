@@ -3,25 +3,28 @@ import time
 import threading 
 from ui import print_menu, print_board_text, read_move_safe
 
+# Server connection settings
+HOST = '127.0.0.1'      # Server IP address (localhost)
+PORT = 5000             # Server port
+FORMAT = 'utf-8'        # Encoding format for messages
+ADDR = (HOST, PORT)     # Full server address tuple
 
-HOST = '127.0.0.1'
-PORT = 5000
-FORMAT = 'utf-8'
-ADDR = (HOST, PORT)
-
-board_size = None
-in_game = False
-waiting_for_move = False 
-game_active = False
-
+# Global state variables
+board_size = None       # Board size (NxN)
+in_game = False         # True if the player is currently in a game
+waiting_for_move = False  # True while waiting for user input
+game_active = False     # True while the game is active
 
 def listen_to_server():
-    """Background thread that listens for server messages"""
+    """
+    Background thread that continuously listens
+    for messages from the server.
+    """
     while True:
         try:
             data = client_socket.recv(1024).decode(FORMAT)
 
-            # connection closed
+            # Connection closed by server
             if not data:
                 print("\n[CONNECTION LOST] Server disconnected")
                 break
@@ -29,13 +32,18 @@ def listen_to_server():
             handle_server_message(data)
 
         except Exception as e:
-            # Only print error if it's not just a closed socket
+            # Print error only if socket is still open
             if client_socket.fileno() != -1:
                 print(f"\n[ERROR] Connection error: {e}")
             break
 
 def start_client():
-    """Main client function"""
+    """
+    Main client function:
+    - Connects to the server
+    - Starts the listener thread
+    - Displays the main menu
+    """
     try:
         client_socket.connect((HOST, PORT))
         print("Connected to server.\n")
@@ -49,29 +57,26 @@ def start_client():
         print(f"\nError: Connection failed - {e}\n")
         return
 
-
-    # -------- START LISTENER THREAD --------
+    # START LISTENER THREAD
     threading.Thread(target=listen_to_server, daemon=True).start()
-    # ---------------------------------------
-
 
     while True:
-
-        # If in game, skip menu
+        # If already inside a game, skip the menu
         if in_game:
             time.sleep(0.2)
             continue
 
-        # Only show menu when not in game
+        # Show main menu
         print_menu()
         choice = input("Choose option: ")
 
+        # Request list of available games
         if choice == "1":
             message = "LIST"
 
+        # Create a new game
         elif choice == "2":
             players = input("How many players (2-13)? ")
-            # Validate input
             try:
                 num = int(players)
                 if num < 2 or num > 13:
@@ -82,9 +87,9 @@ def start_client():
                 continue
             message = f"CREATE {players}"
 
+        # Join an existing game
         elif choice == "3":
             game_id = input("Enter game id: ")
-            # Validate input
             try:
                 int(game_id)
             except ValueError:
@@ -92,6 +97,7 @@ def start_client():
                 continue
             message = f"JOIN {game_id}"
 
+        # Exit client
         elif choice == "4":
             message = "EXIT"
             client_socket.send(message.encode(FORMAT))
@@ -101,8 +107,7 @@ def start_client():
             print("Invalid option")
             continue
 
-
-        # send to server
+        # Send message to server
         try:
             client_socket.send(message.encode(FORMAT))
         except Exception as e:
@@ -111,7 +116,7 @@ def start_client():
 
         time.sleep(0.3)
 
-
+    # Close connection
     try:
         client_socket.close()
     except:
@@ -119,7 +124,10 @@ def start_client():
     print("\nCLOSING CONNECTION...")
 
 def ask_for_move():
-    """Ask player for a move and send it to server"""
+    """
+    Prompts the player for a move and sends it to the server.
+    Runs in a separate thread.
+    """
     global waiting_for_move, game_active
     
     if not game_active:
@@ -128,20 +136,19 @@ def ask_for_move():
     waiting_for_move = True
     print("\nIt is your turn!")
     
-    # Get move from player - pass a lambda that checks game_active
+    # Safe input function that stops if the game ends
     row, col = read_move_safe(board_size, lambda: game_active)
 
-    # Check if game was aborted during input (None returned)
+    # Game aborted during input
     if row is None or col is None:
         waiting_for_move = False
         return
 
-    # Game ended during input
     if not game_active:
         waiting_for_move = False
         return
 
-    # Validate that we got valid integers
+    # Convert input to integers
     try:
         r = int(row)
         c = int(col)
@@ -159,7 +166,7 @@ def ask_for_move():
         waiting_for_move = False
         return
     
-    # Send to server
+    # Send move to server
     try:
         client_socket.send(msg.encode(FORMAT))
     except Exception as e:
@@ -168,14 +175,16 @@ def ask_for_move():
     waiting_for_move = False
 
 def handle_server_message(data):
-    """Handle incoming messages from server"""
+    """
+    Handles raw data received from the server.
+    Supports multiple messages in a single packet.
+    """
     global in_game, board_size
     
     if data.startswith("BOARD"):
         handle_single_message(data.strip())
         return
     
-    # Handle multiple messages in one packet
     messages = data.strip().split('\n')
     
     for message in messages:
@@ -186,66 +195,58 @@ def handle_server_message(data):
         handle_single_message(message)
 
 def handle_single_message(message):
-    """Handle a single message from server"""
+    """
+    Handles a single server message.
+    """
     global in_game, board_size, game_active
     
-    # GAMES - List of available games
+    # List available games
     if message.startswith("GAMES"):
         games = message[6:].strip()
         print("\nAvailable games:")
         if games:
-            # Parse: "waiting 1:2:1 2:3:2"
-            game_list = games[0:].strip().split()
-            if game_list:
-                print("  ID | Players | Joined")
-                print("  " + "-" * 25)
-                for game in game_list:
-                    parts = game.split(':')
-                    if len(parts) == 3:
-                        gid, total, joined = parts
-                        print(f"  {gid:2} | {total:7} | {joined:6}")
-            else:
-                print("  No available games")
-
+            game_list = games.split()
+            print("  ID | Players | Joined")
+            print("  " + "-" * 25)
+            for game in game_list:
+                parts = game.split(':')
+                if len(parts) == 3:
+                    gid, total, joined = parts
+                    print(f"  {gid:2} | {total:7} | {joined:6}")
         else:
             print("  No available games")
         return
 
-    # CREATED - Game created successfully
+    # Game created
     if message.startswith("CREATED"):
         parts = message.split()
         if len(parts) >= 2:
-            game_id = parts[1]
-            print(f"\nGame created successfully. Game ID: {game_id}")
+            print(f"\nGame created successfully. Game ID: {parts[1]}")
         return
 
-    # JOINED - Joined game successfully
+    # Joined game
     if message.startswith("JOINED"):
         in_game = True
         game_active = True
         parts = message.split()
         if len(parts) >= 2:
-            symbol = parts[1]
-            print(f"\nYou joined the game as: {symbol}")
+            print(f"\nYou joined the game as: {parts[1]}")
         return
 
-    # WAIT - Waiting for other players
+    # Waiting for players
     if message.startswith("WAIT"):
         print("\nWaiting for other players to join...")
         return
 
-    # YOURTURN - It's your turn
+    # Player's turn
     if message.startswith("YOURTURN"):
-        # Only start asking for move if game is still active
         if game_active:
             threading.Thread(target=ask_for_move, daemon=True).start()
         return
 
-    # BOARD - Board state
+    # Board state
     if message.startswith("BOARD"):
-        # split board block from the rest
         parts = message.split("\n")
-
         board_part = ["BOARD"]
         rest = []
 
@@ -255,26 +256,22 @@ def handle_single_message(message):
             else:
                 board_part.append(line)
 
-        # print the board
         size = print_board_text("\n".join(board_part))
         if size is not None:
             board_size = size
 
-        # now handle the remaining commands
         for cmd in rest:
             handle_server_message(cmd)
-
         return
 
-    # INVALID - Invalid move
+    # Invalid move
     if message.startswith("INVALID"):
         reason = message[8:].strip() if len(message) > 8 else "Unknown reason"
         print(f"\nInvalid move: {reason}")
         print("Please try again.")
-        # The server should send YOURTURN again, so we wait for that
         return
 
-    # WIN - You won!
+    # Win
     if message == "WIN":
         in_game = False
         game_active = False
@@ -283,7 +280,7 @@ def handle_single_message(message):
         print("=" * 40)
         return
 
-    # LOSE - You lost
+    # Lose
     if message == "LOSE":
         in_game = False
         game_active = False
@@ -292,7 +289,7 @@ def handle_single_message(message):
         print("=" * 40)
         return
 
-    # DRAW - Game ended in draw
+    # Draw
     if message == "DRAW":
         in_game = False
         game_active = False
@@ -301,34 +298,35 @@ def handle_single_message(message):
         print("=" * 40)
         return
 
-    # BYE - Disconnected
+    # Disconnected
     if message == "BYE":
         print("\nDisconnected from server.")
         print("Returning to main menu...")
         return
 
-    # PLAYER_LEFT - someone left the game
+    # Player left the game
     if message.startswith("PLAYER_LEFT"):
         print("\nA player has left the game.")
         return
 
-    # GAME_ABORTED - game cancelled
+    # Game aborted
     if message == "GAME_ABORTED":
         print("\nGame aborted (not enough players).")
         in_game = False
         game_active = False
         return
 
-    # Unknown message - just print it
+    # Unknown message
     if message:
         print(f"\n{message}")
 
-
 if __name__ == "__main__":
+    # Create TCP socket
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     print("=" * 50)
     print("WELCOME TO TIC-TAC-TOE")
     print("=" * 50)
+
     start_client()
     print("\nGoodbye!")
